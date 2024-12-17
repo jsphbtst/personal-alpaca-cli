@@ -53,9 +53,8 @@ pub fn get_cli_matches() -> clap::ArgMatches {
     .get_matches()
 }
 
-pub fn handle_prices_cmd(prices_args_opt: Option<&ArgMatches>, api_key: String, api_secret: String) {
-  let price_args = prices_args_opt.unwrap();
-  let symbol = price_args.get_one::<String>("symbol")
+pub fn handle_prices_cmd(prices_args: &ArgMatches, api_key: String, api_secret: String) {
+  let symbol = prices_args.get_one::<String>("symbol")
     .unwrap_or(&"NONE".to_string())
     .to_uppercase();
 
