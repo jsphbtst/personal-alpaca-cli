@@ -54,9 +54,10 @@ pub fn get_cli_matches() -> clap::ArgMatches {
 }
 
 pub fn handle_prices_cmd(prices_args: &ArgMatches, api_key: String, api_secret: String) {
-  let symbol = prices_args.get_one::<String>("symbol")
-    .unwrap_or(&"NONE".to_string())
-    .to_uppercase();
+  let symbol = match prices_args.get_one::<String>("symbol") {
+    Some(s) => s.to_uppercase(),
+    None => "NONE".to_string()
+  };
 
   let client = AlpacaClient::new(api_key, api_secret);
   match client.fetch_asset(&symbol) {
@@ -106,19 +107,12 @@ pub fn handle_auth_cmd(auth_args: &ArgMatches) {
 pub fn handle_positions_cmd(positions_args: &ArgMatches, api_key: String, api_secret: String) {
   let client = AlpacaClient::new(api_key, api_secret);
 
-  if let Some(s) = positions_args.get_one::<String>("symbol") {
-    let symbol = s.to_uppercase();
-    match client.fetch_positions_by_symbol(symbol) {
-      Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-      Err(e) => {
-        eprintln!("Error fetching asset details: {}", e);
-        std::process::exit(1);
-      }
-    }
-    return;
+  let result = match positions_args.get_one::<String>("symbol") {
+    Some(s) => client.fetch_positions_by_symbol(s.to_uppercase()),
+    None => client.fetch_positions(),
   };
 
-  match client.fetch_positions() {
+  match result {
     Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
     Err(e) => {
       eprintln!("Error fetching asset details: {}", e);
