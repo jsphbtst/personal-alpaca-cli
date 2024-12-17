@@ -16,7 +16,17 @@ pub fn get_cli_matches() -> clap::ArgMatches {
             .aliases(["ticker", "tcker"])
             .required(true)
             .help("Stock ticker symbol")
-              )
+        )
+    )
+    .subcommand(
+      Command::new("positions")
+        .arg(
+          Arg::new("symbol")
+            .short('s')
+            .long("symbol")
+            .aliases(["ticker", "tcker"])
+            .help("Stock ticker symbol")
+        )
     )
     .subcommand(
       Command::new("auth")
@@ -40,24 +50,23 @@ pub fn get_cli_matches() -> clap::ArgMatches {
         .subcommand(Command::new("reset"))
         // TODO: rm
     )
-    .subcommand(Command::new("positions"))
     .get_matches()
 }
 
 pub fn handle_prices_cmd(prices_args_opt: Option<&ArgMatches>, api_key: String, api_secret: String) {
   let price_args = prices_args_opt.unwrap();
-    let symbol = price_args.get_one::<String>("symbol")
-      .unwrap_or(&"NONE".to_string())
-      .to_uppercase();
+  let symbol = price_args.get_one::<String>("symbol")
+    .unwrap_or(&"NONE".to_string())
+    .to_uppercase();
 
-    let client = AlpacaClient::new(api_key, api_secret);
-    match client.fetch_asset(&symbol) {
-      Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-      Err(e) => {
-        eprintln!("Error fetching asset details: {}", e);
-        std::process::exit(1);
-      }
+  let client = AlpacaClient::new(api_key, api_secret);
+  match client.fetch_asset(&symbol) {
+    Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+    Err(e) => {
+      eprintln!("Error fetching asset details: {}", e);
+      std::process::exit(1);
     }
+  }
 }
 
 pub fn handle_auth_cmd(auth_args: &ArgMatches) {

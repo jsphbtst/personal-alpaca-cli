@@ -27,4 +27,30 @@ impl AlpacaClient {
 
     Ok(response)
   }
+
+  pub fn fetch_positions(&self) -> Result<serde_json::Value, reqwest::Error> {
+    let url = "https://api.alpaca.markets/v2/positions";
+
+    let response = self.client.get(url)
+      .header("Accept", "application/json")
+      .header("APCA-API-KEY-ID", &self.api_key)
+      .header("APCA-API-SECRET-KEY", &self.api_secret)
+      .send()?
+      .json()?;
+
+    Ok(response)
+  }
+
+  pub fn fetch_positions_by_symbol(&self, symbol: String) -> Result<serde_json::Value, reqwest::Error> {
+    let url = format!("https://api.alpaca.markets/v2/positions/{}", symbol);
+
+    let response = self.client.get(url)
+      .header("Accept", "application/json")
+      .header("APCA-API-KEY-ID", &self.api_key)
+      .header("APCA-API-SECRET-KEY", &self.api_secret)
+      .send()?
+      .json()?;
+
+    Ok(response)
+  }
 }
