@@ -14,6 +14,27 @@ pub fn get_cli_matches() -> clap::ArgMatches {
             .help("Stock ticker symbol")
               )
     )
+    .subcommand(
+      Command::new("auth")
+        .subcommand(
+          Command::new("set")
+            .arg(
+              Arg::new("api-key")
+                .long("api-key")
+                .aliases(["apikey"])
+                .required(true)
+                .help("Your APCA API Key ID from Alpaca")
+            )
+            .arg(
+              Arg::new("secret-key")
+                .long("secret-key")
+                .aliases(["secretkey"])
+                .required(true)
+                .help("Your APCA Secret Key ID from Alpaca")
+            )
+        )
+        // TODO: rm
+    )
     .subcommand(Command::new("positions"))
     .get_matches()
 }

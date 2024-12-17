@@ -18,3 +18,13 @@ pub fn read_credentials() -> Result<Credentials, Box<dyn std::error::Error>> {
 
   Ok(credentials)
 }
+
+pub fn write_credentials(credentials: &Credentials) -> Result<(), Box<dyn std::error::Error>> {
+  let home = dirs::home_dir().expect("Failed to get home directory");
+  let cred_path = home.join(".config").join("stock-trader").join("credentials.json");
+
+  let json = serde_json::to_string_pretty(credentials)?;
+  fs::write(cred_path, json)?;
+
+  Ok(())
+}

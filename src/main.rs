@@ -7,8 +7,7 @@ mod api;
 use api::AlpacaClient;
 
 mod credentials;
-use credentials::read_credentials;
-
+use credentials::{Credentials, read_credentials, write_credentials};
 
 fn main() {
   let match_result = get_cli_matches();
@@ -36,6 +35,34 @@ fn main() {
       Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
       Err(e) => {
         eprintln!("Error fetching asset details: {}", e);
+        std::process::exit(1);
+      }
+    }
+  }
+
+  let auth_args_opts = match_result.subcommand_matches("auth");
+  if auth_args_opts.is_some() {
+    let auth_args = auth_args_opts.unwrap();
+
+    let auth_set_opts = auth_args.subcommand_matches("set");
+    if auth_set_opts.is_some() {
+      let auth_set_args = auth_set_opts.unwrap();
+
+      let empty_string = "".to_string();
+      let apca_api_key = auth_set_args.get_one::<String>("api-key")
+        .unwrap_or(&empty_string)
+        .to_string();
+      let apca_secret_key = auth_set_args.get_one::<String>("secret-key")
+        .unwrap_or(&empty_string)
+        .to_string();
+
+      let new_credentials = Credentials {
+        apca_api_key: apca_api_key,
+        apca_secret_key: apca_secret_key
+      };
+
+      if let Err(e) = write_credentials(&new_credentials) {
+        eprintln!("Failed to write credentials: {}", e);
         std::process::exit(1);
       }
     }
