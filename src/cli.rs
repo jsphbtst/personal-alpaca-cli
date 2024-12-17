@@ -103,3 +103,27 @@ pub fn handle_auth_cmd(auth_args: &ArgMatches) {
     }
   }
 }
+
+pub fn handle_positions_cmd(positions_args: &ArgMatches, api_key: String, api_secret: String) {
+  let client = AlpacaClient::new(api_key, api_secret);
+
+  if let Some(s) = positions_args.get_one::<String>("symbol") {
+    let symbol = s.to_uppercase();
+    match client.fetch_positions_by_symbol(symbol) {
+      Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+      Err(e) => {
+        eprintln!("Error fetching asset details: {}", e);
+        std::process::exit(1);
+      }
+    }
+    return;
+  };
+
+  match client.fetch_positions() {
+    Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+    Err(e) => {
+      eprintln!("Error fetching asset details: {}", e);
+      std::process::exit(1);
+    }
+  }
+}

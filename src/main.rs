@@ -2,9 +2,8 @@ mod alpaca_api;
 mod credentials;
 mod cli;
 
-use cli::{get_cli_matches, handle_prices_cmd, handle_auth_cmd};
+use cli::{get_cli_matches, handle_prices_cmd, handle_auth_cmd, handle_positions_cmd};
 use credentials::read_credentials;
-use alpaca_api::AlpacaClient;
 
 fn main() {
   let match_result = get_cli_matches();
@@ -33,28 +32,7 @@ fn main() {
   }
 
   if let Some(positions_args) = match_result.subcommand_matches("positions") {
-    let client = AlpacaClient::new(api_key, api_secret);
-
-    if let Some(s) = positions_args.get_one::<String>("symbol") {
-      let symbol = s.to_uppercase();
-      match client.fetch_positions_by_symbol(symbol) {
-        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-        Err(e) => {
-          eprintln!("Error fetching asset details: {}", e);
-          std::process::exit(1);
-        }
-      }
-      return;
-    };
-
-    match client.fetch_positions() {
-      Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-      Err(e) => {
-        eprintln!("Error fetching asset details: {}", e);
-        std::process::exit(1);
-      }
-    }
-
+    handle_positions_cmd(positions_args, api_key, api_secret);
     return;
   }
 }
