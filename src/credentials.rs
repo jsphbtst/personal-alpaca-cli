@@ -9,7 +9,7 @@ pub struct Credentials {
   pub apca_secret_key: String,
 }
 
-pub fn read_credentials() -> Result<Credentials, Box<dyn std::error::Error>> {
+fn read_credentials() -> Result<Credentials, Box<dyn std::error::Error>> {
   let home = dirs::home_dir().expect("Failed to get home directory");
   let cred_path = home.join(".config").join("stock-trader").join("credentials.json");
 
@@ -27,4 +27,10 @@ pub fn write_credentials(credentials: &Credentials) -> Result<(), Box<dyn std::e
   fs::write(cred_path, json)?;
 
   Ok(())
+}
+
+pub fn get_credentials() -> Result<Credentials, Box<dyn std::error::Error>> {
+  let credentials_result = read_credentials();
+  let credentials = credentials_result?;
+  Ok(credentials)
 }
