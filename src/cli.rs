@@ -14,7 +14,6 @@ pub fn get_cli_matches() -> clap::ArgMatches {
             .short('s')
             .long("symbol")
             .aliases(["ticker", "tcker"])
-            .required(true)
             .help("Stock ticker symbol")
         )
     )
@@ -54,13 +53,17 @@ pub fn get_cli_matches() -> clap::ArgMatches {
 }
 
 pub fn handle_prices_cmd(prices_args: &ArgMatches, api_key: String, api_secret: String) {
-  let symbol = match prices_args.get_one::<String>("symbol") {
-    Some(s) => s.to_uppercase(),
-    None => "NONE".to_string()
+  let client = AlpacaClient::new(api_key, api_secret);
+
+  let result = match prices_args.get_one::<String>("symbol") {
+    Some(s) => client.fetch_asset(&s.to_uppercase()),
+    None => {
+      eprintln!("Symbol is required");
+      std::process::exit(1);
+    }
   };
 
-  let client = AlpacaClient::new(api_key, api_secret);
-  match client.fetch_asset(&symbol) {
+  match result {
     Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
     Err(e) => {
       eprintln!("Error fetching asset details: {}", e);
