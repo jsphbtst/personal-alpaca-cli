@@ -33,6 +33,7 @@ pub fn get_cli_matches() -> clap::ArgMatches {
                 .help("Your APCA Secret Key ID from Alpaca")
             )
         )
+        .subcommand(Command::new("reset"))
         // TODO: rm
     )
     .subcommand(Command::new("positions"))

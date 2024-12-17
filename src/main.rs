@@ -43,6 +43,10 @@ fn main() {
   let auth_args_opts = match_result.subcommand_matches("auth");
   if auth_args_opts.is_some() {
     let auth_args = auth_args_opts.unwrap();
+    let mut new_credentials = Credentials {
+      apca_api_key: "".to_string(),
+      apca_secret_key: "".to_string()
+    };
 
     let auth_set_opts = auth_args.subcommand_matches("set");
     if auth_set_opts.is_some() {
@@ -56,11 +60,16 @@ fn main() {
         .unwrap_or(&empty_string)
         .to_string();
 
-      let new_credentials = Credentials {
-        apca_api_key: apca_api_key,
-        apca_secret_key: apca_secret_key
-      };
+      new_credentials.apca_api_key = apca_api_key;
+      new_credentials.apca_secret_key = apca_secret_key;
 
+      if let Err(e) = write_credentials(&new_credentials) {
+        eprintln!("Failed to write credentials: {}", e);
+        std::process::exit(1);
+      }
+    }
+
+    if let Some(_) = auth_args.subcommand_matches("reset") {
       if let Err(e) = write_credentials(&new_credentials) {
         eprintln!("Failed to write credentials: {}", e);
         std::process::exit(1);
