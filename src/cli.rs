@@ -1,5 +1,5 @@
 use serde_json;
-use clap::{command, Arg, Command, ArgMatches};
+use clap::{command, Arg, ArgMatches, Command, value_parser};
 
 use crate::alpaca_api::AlpacaClient;
 use crate::credentials::{write_credentials, Credentials};
@@ -48,6 +48,54 @@ pub fn get_cli_matches() -> clap::ArgMatches {
         )
         .subcommand(Command::new("reset"))
         // TODO: rm
+    )
+    .subcommand(
+      Command::new("orders")
+        .subcommand(
+          Command::new("list")
+            .arg(
+              Arg::new("status")
+                .long("status")
+                .value_parser(["open", "closed", "all"])
+                .default_value("all")
+            )
+        )
+        .subcommand(
+          Command::new("execute")
+            .arg(
+              Arg::new("side")
+                .long("side")
+                .value_parser(["buy", "sell"])
+                .default_value("buy")
+                .help("Type of order execution: buy or sell")
+            )
+            .arg(
+              Arg::new("symbol")
+                .short('s')
+                .long("symbol")
+                .aliases(["ticker", "tcker"])
+                .required(true)
+                .help("Stock ticker symbol")
+            )
+            .arg(
+              Arg::new("notional")
+                .short('n')
+                .long("notional")
+                .value_parser(value_parser!(f64))
+                .aliases(["value", "dollars"])
+                .help("Dollar amount of the stock order")
+            )
+        )
+        .subcommand(
+          Command::new("cancel")
+            .arg(
+              Arg::new("order_id")
+                .long("order_id")
+                .aliases(["orderid", "orderId", "order-id"])
+                .required(true)
+                .help("Order ID to be cancelled (uuid v4 format)")
+            )
+        )
     )
     .get_matches()
 }
@@ -121,5 +169,85 @@ pub fn handle_positions_cmd(positions_args: &ArgMatches, api_key: String, api_se
       eprintln!("Error fetching asset details: {}", e);
       std::process::exit(1);
     }
+  }
+}
+
+pub fn handle_orders_cmd(orders_args: &ArgMatches, api_key: String, api_secret: String) {
+  let client = AlpacaClient::new(api_key, api_secret);
+
+  match orders_args.subcommand_matches("list") {
+    Some(list_args) => {
+      let result = match list_args.get_one::<String>("status") {
+        Some(s) => client.fetch_orders(s.to_lowercase()),
+        None => {
+          eprintln!("Status is required");
+          std::process::exit(1);
+        }
+      };
+
+      match result {
+        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+        Err(e) => {
+          eprintln!("Error fetching asset details: {}", e);
+          std::process::exit(1);
+        }
+      }
+    },
+    None => {}
+  }
+
+  match orders_args.subcommand_matches("execute") {
+    Some(execute_args) => {
+      let side = match execute_args.get_one::<String>("side") {
+        Some(s) => s.to_lowercase(),
+        None => {
+          eprintln!("Error fetching asset details");
+          std::process::exit(1);
+        }
+      };
+
+      let symbol = match execute_args.get_one::<String>("symbol") {
+        Some(s) => s.to_uppercase(),
+        None => {
+          eprintln!("Symbol is required");
+          std::process::exit(1);
+        }
+      };
+
+      let notional = match execute_args.get_one::<f64>("notional") {
+        Some(s) => *s,
+        None => 5.0,
+      };
+
+      match client.create_order(side, symbol, notional) {
+        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+        Err(e) => {
+          eprintln!("Error executing order: {}", e);
+          std::process::exit(1);
+        }
+      }
+    },
+    None => {}
+  }
+
+  match orders_args.subcommand_matches("cancel") {
+    Some(cancel_args) => {
+      let order_id = match cancel_args.get_one::<String>("order_id") {
+        Some(s) => s.to_string(),
+        None => {
+          eprintln!("Order ID is required");
+          std::process::exit(1);
+        }
+      };
+
+      match client.cancel_order(order_id) {
+        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+        Err(e) => {
+          eprintln!("Error canceling order: {}", e);
+          std::process::exit(1);
+        }
+      }
+    },
+    None => {}
   }
 }
