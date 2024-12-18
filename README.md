@@ -1,10 +1,10 @@
-# Alpaca CLI Tool
+# Joseph's Personal Alpaca CLI Tool
 
 A command-line interface tool for interacting with Alpaca Markets API, allowing you to manage orders, check prices, and handle authentication.
 
 ## Installation
 
-[Add installation instructions here]
+Just run `./deploy.sh` and you should be good to go.
 
 ## Usage
 
@@ -117,8 +117,3 @@ Set these using the `auth set` command before using other features.
 - Order IDs must be in UUID v4 format
 - The default order side is "buy" if not specified
 - The default order list status is "all" if not specified
-
-
-## License
-
-[Add license information here]
