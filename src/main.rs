@@ -3,13 +3,13 @@ mod credentials;
 mod cli;
 
 fn main() {
-  let match_result = cli::get_cli_matches();
+  let result = cli::matches::capture();
 
   // Writing this nonverbosely for learning purposes - J
-  let auth_args_opt = match_result.subcommand_matches("auth");
+  let auth_args_opt = result.subcommand_matches("auth");
   if auth_args_opt.is_some() {
     let auth_args = auth_args_opt.unwrap();
-    cli::handle_auth_cmd(auth_args);
+    cli::cmd::handle_auth(auth_args);
     return;
   }
 
@@ -21,18 +21,21 @@ fn main() {
     }
   };
 
-  if let Some(prices_args) = match_result.subcommand_matches("prices") {
-    cli::handle_prices_cmd(prices_args, credentials.apca_api_key, credentials.apca_secret_key);
+  let api_key = credentials.apca_api_key;
+  let api_secret = credentials.apca_secret_key;
+
+  if let Some(prices_args) = result.subcommand_matches("prices") {
+    cli::cmd::handle_prices(prices_args, api_key, api_secret);
     return;
   }
 
-  if let Some(positions_args) = match_result.subcommand_matches("positions") {
-    cli::handle_positions_cmd(positions_args, credentials.apca_api_key, credentials.apca_secret_key);
+  if let Some(positions_args) = result.subcommand_matches("positions") {
+    cli::cmd::handle_positions(positions_args, api_key, api_secret);
     return;
   }
 
-  if let Some(orders_args) = match_result.subcommand_matches("orders") {
-    cli::handle_orders_cmd(orders_args, credentials.apca_api_key, credentials.apca_secret_key);
+  if let Some(orders_args) = result.subcommand_matches("orders") {
+    cli::cmd::handle_orders(orders_args, api_key, api_secret);
     return;
   }
 }
