@@ -4,7 +4,7 @@ A command-line interface tool for interacting with Alpaca Markets API, allowing 
 
 ## Installation
 
-Just run `./deploy.sh` and you should be good to go.
+Just run `./install.sh` and you should be good to go.
 
 ## Usage
 
