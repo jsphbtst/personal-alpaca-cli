@@ -14,10 +14,10 @@ Before using the tool, you need to set up your Alpaca API credentials:
 
 ```bash
 # Set API credentials
-alpaca auth set --api-key YOUR_API_KEY --secret-key YOUR_SECRET_KEY
+stock-trader auth set --api-key YOUR_API_KEY --secret-key YOUR_SECRET_KEY
 
 # Reset credentials
-alpaca auth reset
+stock-trader auth reset
 ```
 
 ### Checking Prices
@@ -25,9 +25,9 @@ alpaca auth reset
 Get price information for a specific stock:
 
 ```bash
-alpaca prices --symbol AAPL
+stock-trader prices --symbol AAPL
 # Alternative: Use -s or --ticker
-alpaca prices -s AAPL
+stock-trader prices -s AAPL
 ```
 
 ### Managing Positions
@@ -35,9 +35,9 @@ alpaca prices -s AAPL
 View positions for a specific stock:
 
 ```bash
-alpaca positions --symbol AAPL
+stock-trader positions --symbol AAPL
 # Alternative: Use -s or --ticker
-alpaca positions -s AAPL
+stock-trader positions -s AAPL
 ```
 
 ### Orders
@@ -48,13 +48,13 @@ View your orders with optional status filtering:
 
 ```bash
 # List all orders (default)
-alpaca orders list
+stock-trader orders list
 
 # List only open orders
-alpaca orders list --status open
+stock-trader orders list --status open
 
 # List only closed orders
-alpaca orders list --status closed
+stock-trader orders list --status closed
 ```
 
 #### Execute Orders
@@ -63,12 +63,12 @@ Place buy or sell orders:
 
 ```bash
 # Buy order
-alpaca orders execute --symbol AAPL --side buy --notional 1000
+stock-trader orders execute --symbol AAPL --side buy --notional 1000
 # Alternative shorter version
-alpaca orders execute -s AAPL --side buy -n 1000
+stock-trader orders execute -s AAPL --side buy -n 1000
 
 # Sell order
-alpaca orders execute --symbol AAPL --side sell --notional 1000
+stock-trader orders execute --symbol AAPL --side sell --notional 1000
 ```
 
 #### Cancel Orders
@@ -76,7 +76,7 @@ alpaca orders execute --symbol AAPL --side sell --notional 1000
 Cancel a specific order using its ID:
 
 ```bash
-alpaca orders cancel --order-id ORDER_UUID
+stock-trader orders cancel --order-id ORDER_UUID
 ```
 
 ## Command Reference
