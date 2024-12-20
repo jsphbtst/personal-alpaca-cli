@@ -155,7 +155,7 @@ pub fn handle_orders(orders_args: &ArgMatches, api_key: String, api_secret: Stri
     None => {}
   }
 
-  match orders_args.subcommand_matches("pick") {
+  match orders_args.subcommand_matches("randombuy") {
     Some(pick_args) => {
       let result = match client.get_positions_tickers() {
         Ok(p) => p,

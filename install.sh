@@ -53,7 +53,7 @@ if ! cargo build --release; then
   exit 1
 fi
 
-if ! cp target/release/stock-trader ~/bin/; then
+if ! sudo cp target/release/stock-trader ~/bin/; then
   echo "Failed to copy binary to ~/bin/"
   exit 1
 fi
