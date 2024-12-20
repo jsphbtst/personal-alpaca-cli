@@ -92,6 +92,18 @@ pub fn capture() -> clap::ArgMatches {
                 .help("Order ID to be cancelled (uuid v4 format)")
             )
         )
+        .subcommand(
+          Command::new("randombuy")
+            .arg(
+              Arg::new("notional")
+                .short('n')
+                .long("notional")
+                .required(true)
+                .value_parser(value_parser!(f64))
+                .aliases(["value", "dollars"])
+                .help("Dollar amount of the stock order")
+            )
+        )
     )
     .get_matches()
 }

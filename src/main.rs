@@ -25,17 +25,17 @@ fn main() {
   let api_secret = credentials.apca_secret_key;
 
   if let Some(prices_args) = result.subcommand_matches("prices") {
-    cli::cmd::handle_prices(prices_args, api_key, api_secret);
+    cli::cmd::handle_prices(prices_args, api_key.clone(), api_secret.clone());
     return;
   }
 
   if let Some(positions_args) = result.subcommand_matches("positions") {
-    cli::cmd::handle_positions(positions_args, api_key, api_secret);
+    cli::cmd::handle_positions(positions_args, api_key.clone(), api_secret.clone());
     return;
   }
 
   if let Some(orders_args) = result.subcommand_matches("orders") {
-    cli::cmd::handle_orders(orders_args, api_key, api_secret);
+    cli::cmd::handle_orders(orders_args, api_key.clone(), api_secret.clone());
     return;
   }
 }

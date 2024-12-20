@@ -154,4 +154,65 @@ pub fn handle_orders(orders_args: &ArgMatches, api_key: String, api_secret: Stri
     },
     None => {}
   }
+
+  match orders_args.subcommand_matches("pick") {
+    Some(pick_args) => {
+      let result = match client.get_positions_tickers() {
+        Ok(p) => p,
+        Err(_e) => Vec::new()
+      };
+
+      let existing_tickers: std::collections::HashSet<String> = result
+          .iter()
+          .map(|position| position.symbol.clone())
+          .collect();
+
+      let mut new_stocks: Vec<String> = client.base_stocks
+        .iter()
+        .filter(|&&stock| !existing_tickers.contains(&String::from(stock)))
+        .map(|&s| String::from(s))
+        .collect();
+
+      println!("Picking...");
+
+      while new_stocks.len() > 2 {
+        let random_num = crate::cli::utils::generate_random_number_api();
+        let mid = new_stocks.len() / 2;
+        if random_num % 2 == 0 {
+          new_stocks = new_stocks[..mid].to_vec();
+        } else {
+          new_stocks = new_stocks[mid..].to_vec();
+        }
+      }
+
+      let symbol: String;
+      if new_stocks.len() == 2 {
+        let final_num = crate::cli::utils::generate_random_number_api();
+        if final_num % 2 == 0 {
+          symbol = new_stocks[0].clone()
+        } else {
+          symbol = new_stocks[1].clone()
+        }
+      } else {
+        symbol = new_stocks[0].clone()
+      }
+
+      let notional = match pick_args.get_one::<f64>("notional") {
+        Some(s) => *s,
+        None => 5.0,
+      };
+
+      println!("Picked {}. Executing order...", symbol);
+
+      let side: String = "buy".to_string();
+      match client.create_order(side, symbol, notional) {
+        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+        Err(e) => {
+          eprintln!("Error executing order: {}", e);
+          std::process::exit(1);
+        }
+      }
+    },
+    None => {}
+  }
 }
