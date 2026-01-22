@@ -10,7 +10,14 @@ pub fn capture() -> clap::ArgMatches {
             .short('s')
             .long("symbol")
             .aliases(["ticker", "tcker"])
-            .help("Stock ticker symbol")
+            .help("Single stock ticker symbol")
+        )
+        .arg(
+          Arg::new("symbols")
+            .long("symbols")
+            .value_delimiter(',')  // Allows: --symbols AAPL,GOOGL,MSFT
+            .num_args(1..)         // One or more values
+            .help("Multiple stock symbols (comma-separated) — fetched concurrently")
         )
     )
     .subcommand(
@@ -21,6 +28,13 @@ pub fn capture() -> clap::ArgMatches {
             .long("symbol")
             .aliases(["ticker", "tcker"])
             .help("Stock ticker symbol")
+        )
+        .arg(
+          Arg::new("symbols")
+            .long("symbols")
+            .value_delimiter(',')  // Allows: --symbols AAPL,GOOGL,MSFT
+            .num_args(1..)         // One or more values
+            .help("Multiple stock symbols (comma-separated) — fetched concurrently")
         )
     )
     .subcommand(

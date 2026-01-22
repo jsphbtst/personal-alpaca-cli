@@ -2,6 +2,8 @@
 
 A command-line interface tool for interacting with Alpaca Markets API, allowing you to manage orders, check prices, and handle authentication.
 
+Built with async Rust using `tokio` and `reqwest`.
+
 ## Installation
 
 Just run `./install.sh` and you should be good to go.
@@ -22,22 +24,31 @@ stock-trader auth reset
 
 ### Checking Prices
 
-Get price information for a specific stock:
+Get price information for stocks:
 
 ```bash
+# Single stock
 stock-trader prices --symbol AAPL
-# Alternative: Use -s or --ticker
 stock-trader prices -s AAPL
+
+# Multiple stocks (fetched concurrently)
+stock-trader prices --symbols AAPL,GOOGL,MSFT,AMZN,TSLA
 ```
 
 ### Managing Positions
 
-View positions for a specific stock:
+View your positions:
 
 ```bash
+# View all positions
+stock-trader positions
+
+# View specific position
 stock-trader positions --symbol AAPL
-# Alternative: Use -s or --ticker
 stock-trader positions -s AAPL
+
+# View multiple positions (fetched concurrently)
+stock-trader positions --symbols AAPL,GOOGL,MSFT
 ```
 
 ### Orders
@@ -64,7 +75,6 @@ Place buy or sell orders:
 ```bash
 # Buy order
 stock-trader orders execute --symbol AAPL --side buy --notional 1000
-# Alternative shorter version
 stock-trader orders execute -s AAPL --side buy -n 1000
 
 # Sell order
@@ -79,33 +89,44 @@ Cancel a specific order using its ID:
 stock-trader orders cancel --order-id ORDER_UUID
 ```
 
+#### Random Buy
+
+Randomly pick and buy a stock from the S&P 500 that you don't already own:
+
+```bash
+stock-trader orders randombuy --notional 100
+stock-trader orders randombuy -n 100
+```
+
 ## Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `prices` | Get price information for a stock |
-| `positions` | View positions for a stock |
+| `prices` | Get price information for stocks |
+| `positions` | View positions |
 | `auth set` | Set API credentials |
 | `auth reset` | Reset API credentials |
 | `orders list` | List orders with optional status filter |
 | `orders execute` | Execute buy/sell orders |
 | `orders cancel` | Cancel a specific order |
+| `orders randombuy` | Randomly buy a stock from S&P 500 |
 
 ## Options
 
-### Global Options
+### Symbol Options
 
-- `-s, --symbol, --ticker`: Stock ticker symbol
+- `-s, --symbol`: Single stock ticker symbol
+- `--symbols`: Multiple symbols, comma-separated (fetched concurrently)
+
+### Order Options
+
 - `--side`: Type of order (buy/sell)
-- `-n, --notional, --value, --dollars`: Dollar amount for orders
-
-### Order Status Options
-
+- `-n, --notional`: Dollar amount for orders
 - `--status`: Filter orders by status (open/closed/all)
 
 ## Authentication
 
-The tool requires Alpaca API credentials to function. You can obtain these from your Alpaca dashboard:
+The tool requires Alpaca API credentials. Get these from your Alpaca dashboard:
 1. API Key ID
 2. Secret Key ID
 
@@ -117,3 +138,4 @@ Set these using the `auth set` command before using other features.
 - Order IDs must be in UUID v4 format
 - The default order side is "buy" if not specified
 - The default order list status is "all" if not specified
+- Multiple symbol queries are fetched concurrently for performance

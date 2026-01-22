@@ -1,218 +1,203 @@
-use serde_json;
 use clap::ArgMatches;
 
 use crate::alpaca_api::AlpacaClient;
 use crate::credentials::{write_credentials, Credentials};
+use crate::error::{AppError, AppResult};
 
-pub fn handle_prices(prices_args: &ArgMatches, api_key: String, api_secret: String) {
-  let client = AlpacaClient::new(api_key, api_secret);
-
-  let result = match prices_args.get_one::<String>("symbol") {
-    Some(s) => client.fetch_asset(&s.to_uppercase()),
-    None => {
-      eprintln!("Symbol is required");
-      std::process::exit(1);
-    }
-  };
-
-  match result {
-    Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-    Err(e) => {
-      eprintln!("Error fetching asset details: {}", e);
-      std::process::exit(1);
-    }
+pub fn handle_auth(auth_args: &ArgMatches) -> AppResult<()> {
+  if let Some(set_args) = auth_args.subcommand_matches("set") {
+    let credentials = Credentials {
+      apca_api_key: set_args
+        .get_one::<String>("api-key")
+        .cloned()
+        .unwrap_or_default(),
+      apca_secret_key: set_args
+        .get_one::<String>("secret-key")
+        .cloned()
+        .unwrap_or_default(),
+    };
+    write_credentials(&credentials)?;
+    return Ok(());
   }
+
+  if auth_args.subcommand_matches("reset").is_some() {
+    let empty_credentials = Credentials {
+      apca_api_key: String::new(),
+      apca_secret_key: String::new(),
+    };
+    write_credentials(&empty_credentials)?;
+    return Ok(());
+  }
+
+  Ok(())
 }
 
-pub fn handle_auth(auth_args: &ArgMatches) {
-  let mut new_credentials = Credentials {
-    apca_api_key: "".to_string(),
-    apca_secret_key: "".to_string()
-  };
+pub async fn handle_prices(prices_args: &ArgMatches, api_key: &str, api_secret: &str) -> AppResult<()> {
+  let client = AlpacaClient::new(api_key.to_string(), api_secret.to_string());
 
-  let auth_set_opts = auth_args.subcommand_matches("set");
-  if auth_set_opts.is_some() {
-    let auth_set_args = auth_set_opts.unwrap();
+  if let Some(symbols) = prices_args.get_many::<String>("symbols") {
+    let symbols: Vec<String> = symbols.map(|s| s.to_uppercase()).collect();
 
-    let empty_string = "".to_string();
-    let apca_api_key = auth_set_args.get_one::<String>("api-key")
-      .unwrap_or(&empty_string)
-      .to_string();
-    let apca_secret_key = auth_set_args.get_one::<String>("secret-key")
-      .unwrap_or(&empty_string)
-      .to_string();
+    println!("Fetching {} symbols concurrently...\n", symbols.len());
 
-    new_credentials.apca_api_key = apca_api_key;
-    new_credentials.apca_secret_key = apca_secret_key;
+    let futures: Vec<_> = symbols
+      .iter()
+      .map(|symbol| client.fetch_asset(symbol))
+      .collect();
 
-    if let Err(e) = write_credentials(&new_credentials) {
-      eprintln!("Failed to write credentials: {}", e);
-      std::process::exit(1);
-    }
-  }
+    let results = futures::future::join_all(futures).await;
 
-  if let Some(_) = auth_args.subcommand_matches("reset") {
-    if let Err(e) = write_credentials(&new_credentials) {
-      eprintln!("Failed to write credentials: {}", e);
-      std::process::exit(1);
-    }
-  }
-}
-
-pub fn handle_positions(positions_args: &ArgMatches, api_key: String, api_secret: String) {
-  let client = AlpacaClient::new(api_key, api_secret);
-
-  let result = match positions_args.get_one::<String>("symbol") {
-    Some(s) => client.fetch_positions_by_symbol(s.to_uppercase()),
-    None => client.fetch_positions(),
-  };
-
-  match result {
-    Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-    Err(e) => {
-      eprintln!("Error fetching asset details: {}", e);
-      std::process::exit(1);
-    }
-  }
-}
-
-pub fn handle_orders(orders_args: &ArgMatches, api_key: String, api_secret: String) {
-  let client = AlpacaClient::new(api_key, api_secret);
-
-  match orders_args.subcommand_matches("list") {
-    Some(list_args) => {
-      let result = match list_args.get_one::<String>("status") {
-        Some(s) => client.fetch_orders(s.to_lowercase()),
-        None => {
-          eprintln!("Status is required");
-          std::process::exit(1);
-        }
-      };
-
+    for (symbol, result) in symbols.iter().zip(results) {
       match result {
-        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+        Ok(asset) => {
+          println!("{}:", symbol);
+          println!("  Name: {}", asset.name);
+          println!("  Exchange: {}", asset.exchange);
+          println!("  Tradable: {}", asset.tradable);
+          println!();
+        }
         Err(e) => {
-          eprintln!("Error fetching asset details: {}", e);
-          std::process::exit(1);
+          println!("{}: Error - {}\n", symbol, e);
         }
       }
-    },
-    None => {}
+    }
+
+    return Ok(());
   }
 
-  match orders_args.subcommand_matches("execute") {
-    Some(execute_args) => {
-      let side = match execute_args.get_one::<String>("side") {
-        Some(s) => s.to_lowercase(),
-        None => {
-          eprintln!("Error fetching asset details");
-          std::process::exit(1);
-        }
-      };
-
-      let symbol = match execute_args.get_one::<String>("symbol") {
-        Some(s) => s.to_uppercase(),
-        None => {
-          eprintln!("Symbol is required");
-          std::process::exit(1);
-        }
-      };
-
-      let notional = match execute_args.get_one::<f64>("notional") {
-        Some(s) => *s,
-        None => 5.0,
-      };
-
-      match client.create_order(side, symbol, notional) {
-        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-        Err(e) => {
-          eprintln!("Error executing order: {}", e);
-          std::process::exit(1);
-        }
-      }
-    },
-    None => {}
+  if let Some(symbol) = prices_args.get_one::<String>("symbol") {
+    let asset = client.fetch_asset(&symbol.to_uppercase()).await?;
+    println!("{}", serde_json::to_string_pretty(&asset)?);
+    return Ok(());
   }
 
-  match orders_args.subcommand_matches("cancel") {
-    Some(cancel_args) => {
-      let order_id = match cancel_args.get_one::<String>("order_id") {
-        Some(s) => s.to_string(),
-        None => {
-          eprintln!("Order ID is required");
-          std::process::exit(1);
-        }
-      };
+  Err(AppError::MissingArgument("symbol or symbols".into()))
+}
 
-      match client.cancel_order(order_id) {
-        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
+pub async fn handle_positions(positions_args: &ArgMatches, api_key: &str, api_secret: &str) -> AppResult<()> {
+  let client = AlpacaClient::new(api_key.to_string(), api_secret.to_string());
+
+  if let Some(symbols) = positions_args.get_many::<String>("symbols") {
+    let symbols: Vec<String> = symbols.map(|s| s.to_uppercase()).collect();
+
+    println!("Fetching {} symbols concurrently...\n", symbols.len());
+
+    let futures: Vec<_> = symbols
+      .iter()
+      .map(|symbol| client.fetch_positions_by_symbol(symbol.to_string()))
+      .collect();
+
+    let results = futures::future::join_all(futures).await;
+
+    for (symbol, result) in symbols.iter().zip(results) {
+      match result {
+        Ok(position) => {
+          println!("Symbol: {}", position.symbol);
+          println!("Current price: {}", position.current_price);
+          println!("Qty: {}", position.qty);
+        }
         Err(e) => {
-          eprintln!("Error canceling order: {}", e);
-          std::process::exit(1);
+          println!("{}: Error - {}\n", symbol, e)
         }
       }
-    },
-    None => {}
+    }
+    return Ok(());
   }
 
-  match orders_args.subcommand_matches("randombuy") {
-    Some(pick_args) => {
-      let result = match client.get_positions_tickers() {
-        Ok(p) => p,
-        Err(_e) => Vec::new()
-      };
+  match positions_args.get_one::<String>("symbol") {
+    Some(s) => {
+      let position = client.fetch_positions_by_symbol(s.to_uppercase()).await?;
+      println!("{}", serde_json::to_string_pretty(&position)?);
+    }
+    None => {
+      let positions = client.fetch_positions().await?;
+      println!("{}", serde_json::to_string_pretty(&positions)?);
+    }
+  };
 
-      let existing_tickers: std::collections::HashSet<String> = result
-          .iter()
-          .map(|position| position.symbol.clone())
-          .collect();
+  Ok(())
+}
 
-      let mut new_stocks: Vec<String> = client.base_stocks
-        .iter()
-        .filter(|&&stock| !existing_tickers.contains(&String::from(stock)))
-        .map(|&s| String::from(s))
-        .collect();
+pub async fn handle_orders(orders_args: &ArgMatches, api_key: &str, api_secret: &str) -> AppResult<()> {
+  let client = AlpacaClient::new(api_key.to_string(), api_secret.to_string());
 
-      println!("Picking...");
+  if let Some(list_args) = orders_args.subcommand_matches("list") {
+    let status = list_args
+      .get_one::<String>("status")
+      .ok_or_else(|| AppError::MissingArgument("status".into()))?;
 
-      while new_stocks.len() > 2 {
-        let random_num = crate::cli::utils::generate_random_number_api();
-        let mid = new_stocks.len() / 2;
-        if random_num % 2 == 0 {
-          new_stocks = new_stocks[..mid].to_vec();
-        } else {
-          new_stocks = new_stocks[mid..].to_vec();
-        }
-      }
+    let json = client.fetch_orders(status.to_lowercase()).await?;
+    println!("{}", serde_json::to_string_pretty(&json)?);
 
-      let symbol: String;
-      if new_stocks.len() == 2 {
-        let final_num = crate::cli::utils::generate_random_number_api();
-        if final_num % 2 == 0 {
-          symbol = new_stocks[0].clone()
-        } else {
-          symbol = new_stocks[1].clone()
-        }
-      } else {
-        symbol = new_stocks[0].clone()
-      }
-
-      let notional = match pick_args.get_one::<f64>("notional") {
-        Some(s) => *s,
-        None => 5.0,
-      };
-
-      println!("Picked {}. Executing order...", symbol);
-
-      let side: String = "buy".to_string();
-      match client.create_order(side, symbol, notional) {
-        Ok(json) => println!("{}", serde_json::to_string_pretty(&json).unwrap()),
-        Err(e) => {
-          eprintln!("Error executing order: {}", e);
-          std::process::exit(1);
-        }
-      }
-    },
-    None => {}
+    return Ok(());
   }
+
+  if let Some(execute_args) = orders_args.subcommand_matches("execute") {
+    let side = execute_args
+      .get_one::<String>("side")
+      .ok_or_else(|| AppError::MissingArgument("side".into()))?;
+
+    let symbol = execute_args
+      .get_one::<String>("symbol")
+      .ok_or_else(|| AppError::MissingArgument("symbol".into()))?;
+
+    let notional = execute_args
+      .get_one::<f64>("notional")
+      .copied()
+      .unwrap_or(5.0);
+
+    let json = client.create_order(side.to_lowercase(), symbol.to_uppercase(), notional).await?;
+    println!("{}", serde_json::to_string_pretty(&json)?);
+
+    return Ok(());
+  }
+
+  if let Some(cancel_args) = orders_args.subcommand_matches("cancel") {
+    let order_id = cancel_args
+      .get_one::<String>("order_id")
+      .ok_or_else(|| AppError::MissingArgument("order_id".into()))?;
+
+    let json = client.cancel_order(order_id.to_string()).await?;
+    println!("{}", serde_json::to_string_pretty(&json)?);
+
+    return Ok(());
+  }
+
+  if let Some(pick_args) = orders_args.subcommand_matches("randombuy") {
+    let positions = client.fetch_positions().await?;
+
+    let existing: std::collections::HashSet<String> = positions
+      .iter()
+      .map(|p| p.symbol.clone())
+      .collect();
+
+    let candidates: Vec<String> = client
+      .base_stocks
+      .iter()
+      .filter(|&&s| !existing.contains(s))
+      .map(|&s| s.to_string())
+      .collect();
+
+    println!("Picking from {} candidates...", candidates.len());
+
+    let symbol = crate::cli::utils::select_random_stock(
+      candidates,
+      crate::cli::utils::generate_random_number,
+    )
+    .ok_or_else(|| AppError::Config("No stocks available to buy".into()))?;
+
+    let notional = pick_args
+      .get_one::<f64>("notional")
+      .copied()
+      .unwrap_or(5.0);
+
+    println!("Picked {}. Executing order...", symbol);
+
+    let order = client.create_order("buy".to_string(), symbol, notional).await?;
+    println!("{}", serde_json::to_string_pretty(&order)?);
+
+    return Ok(());
+  }
+
+  Ok(())
 }

@@ -1,17 +1,49 @@
-use reqwest::blocking::Client;
-use serde_json::{json, from_value};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::error::AppResult;
 
 pub struct AlpacaClient {
   api_key: String,
   api_secret: String,
   base_url: String,
   client: Client,
-  pub base_stocks: [&'static str; 500]
+  pub base_stocks: [&'static str; 500],
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Asset {
+  pub id: String,
+  pub symbol: String,
+  pub name: String,
+  pub exchange: String,
+  pub status: String,
+  pub tradable: bool,
+  pub fractionable: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Position {
-  pub symbol: String
+  pub symbol: String,
+  pub qty: String,
+  pub market_value: String,
+  pub unrealized_pl: String,
+  pub current_price: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Order {
+  pub id: String,
+  pub symbol: String,
+  pub side: String,
+  pub qty: Option<String>,
+  pub notional: Option<String>,
+  pub status: String,
+  #[serde(rename = "type")]
+  pub order_type: String,
+  pub filled_at: Option<String>,
+  pub created_at: String,
 }
 
 pub const SP500_STOCKS: [&str; 500] = [
@@ -79,65 +111,82 @@ impl AlpacaClient {
     }
   }
 
-  fn get_request(&self, url: String) -> Result<serde_json::Value, reqwest::Error> {
-    let response = self.client.get(url)
+  async fn get_request<T>(&self, url: &str) -> AppResult<T>
+  where
+    T: serde::de::DeserializeOwned,
+  {
+    let response = self
+      .client
+      .get(url)
       .header("Accept", "application/json")
       .header("APCA-API-KEY-ID", &self.api_key)
       .header("APCA-API-SECRET-KEY", &self.api_secret)
-      .send()?
-      .json()?;
+      .send()
+      .await?
+      .json()
+      .await?;
 
     Ok(response)
   }
 
-  fn post_request(&self, url: String, body: serde_json::Value) -> Result<serde_json::Value, reqwest::Error> {
-    let response = self.client.post(url)
+  async fn post_request<T>(&self, url: &str, body: serde_json::Value) -> AppResult<T>
+  where
+    T: serde::de::DeserializeOwned,
+  {
+    let response = self
+      .client
+      .post(url)
       .header("Accept", "application/json")
       .header("APCA-API-KEY-ID", &self.api_key)
       .header("APCA-API-SECRET-KEY", &self.api_secret)
       .json(&body)
-      .send()?
-      .json()?;
+      .send()
+      .await?
+      .json()
+      .await?;
 
     Ok(response)
   }
 
-  fn delete_request(&self, url: String) -> Result<serde_json::Value, reqwest::Error> {
-    let response = self.client.delete(url)
+  async fn delete_request(&self, url: &str) -> AppResult<serde_json::Value> {
+    let response = self
+      .client
+      .delete(url)
       .header("Accept", "application/json")
       .header("APCA-API-KEY-ID", &self.api_key)
       .header("APCA-API-SECRET-KEY", &self.api_secret)
-      .send()?;
+      .send()
+      .await?;
 
     if response.status() == reqwest::StatusCode::NO_CONTENT {
       return Ok(serde_json::json!({}));
     }
 
-    let json = response.json()?;
+    let json = response.json().await?;
     Ok(json)
   }
 
-  pub fn fetch_asset(&self, symbol: &str) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn fetch_asset(&self, symbol: &str) -> AppResult<Asset> {
     let url = format!("{}/v2/assets/{}", &self.base_url, symbol);
-    self.get_request(url)
+    self.get_request(&url).await
   }
 
-  pub fn fetch_positions(&self) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn fetch_positions(&self) -> AppResult<Vec<Position>> {
     let url = format!("{}/v2/positions", &self.base_url);
-    self.get_request(url)
+    self.get_request(&url).await
   }
 
-  pub fn fetch_positions_by_symbol(&self, symbol: String) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn fetch_positions_by_symbol(&self, symbol: String) -> AppResult<Position> {
     let url = format!("{}/v2/positions/{}", &self.base_url, symbol);
-    self.get_request(url)
+    self.get_request(&url).await
   }
 
-  pub fn fetch_orders(&self, status: String) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn fetch_orders(&self, status: String) -> AppResult<Vec<Order>> {
     let url = format!("{}/v2/orders?status={}", &self.base_url, status);
-    self.get_request(url)
+    self.get_request(&url).await
   }
 
-  pub fn create_order(&self, side: String, symbol: String, notional: f64) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn create_order(&self, side: String, symbol: String, notional: f64) -> AppResult<Order> {
     let url = format!("{}/v2/orders", &self.base_url);
     let body = json!({
       "symbol": symbol,
@@ -147,17 +196,11 @@ impl AlpacaClient {
       "time_in_force": "day"
     });
 
-    self.post_request(url, body)
+    self.post_request(&url, body).await
   }
 
-  pub fn cancel_order(&self, order_id: String) -> Result<serde_json::Value, reqwest::Error> {
+  pub async fn cancel_order(&self, order_id: String) -> AppResult<Value> {
     let url = format!("{}/v2/orders/{}", &self.base_url, order_id);
-    self.delete_request(url)
-  }
-
-  pub fn get_positions_tickers(&self) -> Result<Vec<Position>, Box<dyn std::error::Error>> {
-    let result = self.fetch_positions()?; // Gets us the serde_json::Value - J
-    let positions: Vec<Position> = from_value(result)?;
-    Ok(positions)
+    self.delete_request(&url).await
   }
 }
