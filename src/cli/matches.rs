@@ -119,5 +119,17 @@ pub fn capture() -> clap::ArgMatches {
             )
         )
     )
+    .subcommand(
+      Command::new("stream")
+        .about("Stream real-time trade data via websocket")
+        .arg(
+          Arg::new("symbols")
+            .long("symbols")
+            .required(true)
+            .value_delimiter(',')
+            .num_args(1..)
+            .help("Symbols to stream (comma-separated)")
+        )
+    )
     .get_matches()
 }

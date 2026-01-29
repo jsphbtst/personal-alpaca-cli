@@ -2,6 +2,7 @@ mod alpaca_api;
 mod cli;
 mod credentials;
 mod error;
+mod websocket;
 
 use error::AppResult;
 
@@ -26,6 +27,15 @@ async fn run() -> AppResult<()> {
 
   if let Some(orders_args) = matches.subcommand_matches("orders") {
     return cli::cmd::handle_orders(orders_args, &api_key, &api_secret).await;
+  }
+
+  if let Some(stream_args) = matches.subcommand_matches("stream") {
+    let symbols: Vec<String> = stream_args
+      .get_many::<String>("symbols")
+      .unwrap()
+      .cloned()
+      .collect();
+    return websocket::stream_trades(&api_key, &api_secret, symbols).await;
   }
 
   Ok(())
