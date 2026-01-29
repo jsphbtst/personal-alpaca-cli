@@ -5,8 +5,6 @@ pub fn generate_random_number() -> i32 {
   rng.gen_range(1..=1000000)
 }
 
-/// Selects a random stock from a list using binary search elimination.
-/// Takes a random number generator function to enable testing.
 pub fn select_random_stock<F>(mut candidates: Vec<String>, mut rand_fn: F) -> Option<String>
 where
   F: FnMut() -> i32,

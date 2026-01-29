@@ -131,5 +131,17 @@ pub fn capture() -> clap::ArgMatches {
             .help("Symbols to stream (comma-separated)")
         )
     )
+    .subcommand(
+      Command::new("chart")
+        .about("Live price chart (TUI)")
+        .arg(
+          Arg::new("symbols")
+            .long("symbols")
+            .required(true)
+            .value_delimiter(',')
+            .num_args(1..)
+            .help("Symbols to chart (comma-separated)")
+        )
+    )
     .get_matches()
 }

@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
+use tokio::sync::mpsc;
+
 use crate::error::{AppError, AppResult};
+use crate::tui::PriceUpdate;
 
 const STREAM_URL: &str = "wss://stream.data.alpaca.markets/v2/iex";
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
@@ -35,10 +38,10 @@ struct StreamMessage {
     msg: Option<String>,
     #[serde(rename = "S")]
     symbol: Option<String>,
-    #[serde(rename = "p")]
-    price: Option<f64>,
-    #[serde(rename = "s")]
-    size: Option<u64>,
+    // #[serde(rename = "p")]
+    // price: Option<f64>,
+    // #[serde(rename = "s")]
+    // size: Option<u64>,
     #[serde(rename = "bp")]
     bid_price: Option<f64>,
     #[serde(rename = "ap")]
@@ -51,10 +54,9 @@ struct QuoteState {
     ask: f64,
 }
 
-/// Tracks display state for in-place updates
 struct DisplayState {
     quotes: HashMap<String, QuoteState>,
-    symbols: Vec<String>,  // Ordered list for consistent display
+    symbols: Vec<String>,
     lines_printed: usize,
 }
 
@@ -179,7 +181,6 @@ pub async fn stream_trades(api_key: &str, api_secret: &str, symbols: Vec<String>
 
         attempt = 0;
 
-        // Create display state with ordered symbols
         let mut display = DisplayState::new(symbols.clone());
 
         let exit_reason = process_messages(&mut read, &mut display).await;
@@ -207,7 +208,6 @@ where
                 return StreamExit::Shutdown;
             }
 
-            // Wrap read in timeout - triggers reconnect if no data for 30s
             result = timeout(HEARTBEAT_TIMEOUT, read.next()) => {
                 match result {
                     // Got message within timeout
@@ -251,6 +251,96 @@ fn handle_text_message(text: &str, display: &mut DisplayState) {
                     if let Some(msg) = &m.msg {
                         eprintln!("[error: {msg}]");
                     }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Stream prices to a channel (for TUI mode)
+pub async fn stream_to_channel(
+    api_key: &str,
+    api_secret: &str,
+    symbols: Vec<String>,
+    tx: mpsc::Sender<PriceUpdate>,
+) -> AppResult<()> {
+    let mut attempt = 0;
+
+    loop {
+        attempt += 1;
+
+        if attempt > MAX_RECONNECT_ATTEMPTS {
+            return Err(AppError::Api(format!(
+                "Failed to connect after {MAX_RECONNECT_ATTEMPTS} attempts"
+            )));
+        }
+
+        if attempt > 1 {
+            let backoff = INITIAL_BACKOFF_MS * 2_u64.pow(attempt - 2);
+            sleep(Duration::from_millis(backoff)).await;
+        }
+
+        let ws_stream = match connect_async(STREAM_URL).await {
+            Ok((stream, _)) => stream,
+            Err(_) => continue,
+        };
+
+        let (mut write, mut read) = ws_stream.split();
+
+        if read.next().await.is_none() {
+            continue;
+        }
+
+        let auth = AuthMessage {
+            action: "auth",
+            key: api_key,
+            secret: api_secret,
+        };
+
+        if write.send(Message::Text(serde_json::to_string(&auth)?)).await.is_err() {
+            continue;
+        }
+
+        if read.next().await.is_none() {
+            continue;
+        }
+
+        let subscribe = SubscribeMessage {
+            action: "subscribe",
+            trades: symbols.clone(),
+            quotes: symbols.clone(),
+        };
+
+        if write.send(Message::Text(serde_json::to_string(&subscribe)?)).await.is_err() {
+            continue;
+        }
+
+        attempt = 0;
+
+        loop {
+            let result = timeout(HEARTBEAT_TIMEOUT, read.next()).await;
+
+            match result {
+                Ok(Some(Ok(Message::Text(text)))) => {
+                    if let Ok(messages) = serde_json::from_str::<Vec<StreamMessage>>(&text) {
+                        for m in messages {
+                            if m.msg_type == "q" {
+                                if let (Some(sym), Some(bp), Some(ap)) =
+                                    (m.symbol, m.bid_price, m.ask_price)
+                                {
+                                    let mid_price = (bp + ap) / 2.0;
+                                    let _ = tx.send(PriceUpdate {
+                                        symbol: sym,
+                                        price: mid_price,
+                                    }).await;
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(Some(Ok(Message::Close(_)))) | Ok(Some(Err(_))) | Ok(None) | Err(_) => {
+                    break; // Reconnect
                 }
                 _ => {}
             }

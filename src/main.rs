@@ -2,9 +2,11 @@ mod alpaca_api;
 mod cli;
 mod credentials;
 mod error;
+mod tui;
 mod websocket;
 
 use error::AppResult;
+use tokio::sync::mpsc;
 
 async fn run() -> AppResult<()> {
   let matches = cli::matches::capture();
@@ -36,6 +38,28 @@ async fn run() -> AppResult<()> {
       .cloned()
       .collect();
     return websocket::stream_trades(&api_key, &api_secret, symbols).await;
+  }
+
+  if let Some(chart_args) = matches.subcommand_matches("chart") {
+    let symbols: Vec<String> = chart_args
+      .get_many::<String>("symbols")
+      .unwrap()
+      .cloned()
+      .collect();
+
+    // Create channel for websocket -> TUI communication
+    let (tx, rx) = mpsc::channel(100);
+
+    // Spawn websocket task
+    let ws_symbols = symbols.clone();
+    let ws_key = api_key.clone();
+    let ws_secret = api_secret.clone();
+    tokio::spawn(async move {
+      let _ = websocket::stream_to_channel(&ws_key, &ws_secret, ws_symbols, tx).await;
+    });
+
+    // Run TUI (blocks until user quits)
+    return tui::run(symbols, rx).await;
   }
 
   Ok(())
